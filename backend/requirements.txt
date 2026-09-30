@@ -1,0 +1,10 @@
+# --- Processamento (api.py -> sidecar.service -> processing/) ---
+openpyxl>=3.1
+networkx>=3
+
+# --- Relatório .docx (Modules/docs -> processing/docx) ---
+python-docx>=1.1
+
+# --- API HTTP local (api.py) — ponte para o frontend React ---
+fastapi>=0.115
+uvicorn>=0.30

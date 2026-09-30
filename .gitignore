@@ -1,0 +1,21 @@
+# Dependencias
+node_modules/
+venv/
+.venv/
+
+# Build / saida do Vite
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Logs e arquivos de runtime
+logs/
+*.log
+
+# Ambiente
+.env
+.env.*
