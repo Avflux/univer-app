@@ -2,6 +2,7 @@
 node_modules/
 venv/
 .venv/
+.vscode/
 
 # Build / saida do Vite
 dist/
@@ -19,3 +20,4 @@ logs/
 # Ambiente
 .env
 .env.*
+

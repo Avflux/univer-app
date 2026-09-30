@@ -319,6 +319,39 @@ export function App() {
         }
     }, [mensagemComProjeto]);
 
+    /** Gera o relatório .pdf no backend (converte o .docx gerado em PDF nativo via Word). */
+    const exportPdf = useCallback(async () => {
+        setBusy(true);
+        setMessage({ tipo: 'info', texto: 'Gerando o relatório .pdf…' });
+        try {
+            const result = await univerApi.exportPdf();
+            if (result.status === 'sucesso' && result.arquivo) {
+                const nome = result.arquivo.split(/[\\/]/).pop() ?? result.arquivo;
+                setMessage({
+                    tipo: 'ok',
+                    texto: `${result.mensagem ?? `Relatório PDF gerado: ${nome}`} `,
+                    href: `${API_BASE}/api/download?path=${encodeURIComponent(result.arquivo)}`,
+                });
+            } else {
+                setMessage({
+                    tipo: 'erro',
+                    texto: mensagemComProjeto(
+                        result.mensagem ?? 'Não foi possível gerar o relatório .pdf.'
+                    ),
+                });
+            }
+        } catch (error) {
+            setMessage({
+                tipo: 'erro',
+                texto: `Falha ao gerar o .pdf: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            });
+        } finally {
+            setBusy(false);
+        }
+    }, [mensagemComProjeto]);
+
     const workbook = useMemo(() => (output ? buildOutputWorkbook(output) : null), [output]);
     const docSnapshot = useMemo(() => (docResult ? buildOutputDocument(docResult) : null), [docResult]);
 
@@ -375,6 +408,13 @@ export function App() {
                         onClick={() => void exportDocx()}
                     >
                         Exportar .docx
+                    </button>
+                    <button
+                        className="app-button"
+                        disabled={busy || loading}
+                        onClick={() => void exportPdf()}
+                    >
+                        Exportar .pdf
                     </button>
                     <button
                         className="app-button app-button--icon"

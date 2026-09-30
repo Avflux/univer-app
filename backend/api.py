@@ -648,6 +648,25 @@ def export_docx(payload: DocxExportPayload) -> dict[str, Any]:
     )
 
 
+@app.post("/api/export/pdf")
+def export_pdf(payload: DocxExportPayload) -> dict[str, Any]:
+    """Gera o relatório em ``.pdf`` com as tabelas de cada equipamento.
+
+    Preenche o modelo de ``Modules/docs`` e converte o documento resultante
+    em PDF nativo via Word COM. O arquivo sai no last_directory, é aberto no
+    leitor de PDF padrão do sistema e fica disponível para download via
+    ``GET /api/download``.
+    """
+    service, error = get_service()
+    if service is None:
+        return _demo_unavailable(error)
+    return service.export_pdf(
+        bay_id=payload.bay_id,
+        template_path=payload.template_path,
+        output_path=payload.output_path,
+    )
+
+
 def _demo_docx_univer() -> dict[str, Any]:
     """Gera dados de exemplo para o Univer Doc no modo demo."""
     return {

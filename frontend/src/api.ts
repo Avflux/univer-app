@@ -212,6 +212,13 @@ export const univerApi = {
             body: JSON.stringify(payload ?? {}),
         }),
 
+    /** Gera o relatório `.pdf` com as tabelas dos bays nas chaves do modelo. */
+    exportPdf: (payload?: { bay_id?: string; template_path?: string; output_path?: string }) =>
+        request<DocxResult>('/api/export/pdf', {
+            method: 'POST',
+            body: JSON.stringify(payload ?? {}),
+        }),
+
     /** Gera o relatório do modelo Word em memória e devolve os elementos para o Univer Doc. */
     exportDocxUniver: (payload?: { bay_id?: string; template_path?: string }) =>
         request<DocxUniverResult>('/api/export/docx/univer', {

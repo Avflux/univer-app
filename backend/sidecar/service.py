@@ -637,6 +637,178 @@ def export_docx(
     }
 
 
+def export_pdf(
+    bay_id: str | None = None,
+    template_path: str | None = None,
+    output_path: str | None = None,
+) -> dict:
+    """Gera o relatório em .pdf a partir do modelo Word com as tabelas de cada equipamento.
+
+    Args:
+        bay_id: Restringe o relatório a um bay (padrão: todos os bays).
+        template_path: Modelo .docx com as chaves (padrão: primeiro .docx de Modules/docs).
+        output_path: Caminho do arquivo .pdf gerado (padrão: last_directory).
+
+    Retorna:
+      {
+        "status": "sucesso",
+        "arquivo": "J:\\...\\Relatorio_Equipamentos.pdf",
+        "bays": 3,
+        "tabelas": 12,
+        "aberto": True,
+        "aviso": None,
+        "mensagem": "Relatório PDF gerado: ...",
+      }
+    """
+    from pathlib import Path
+
+    from backend.core.utils.file_lock_checker import is_file_locked
+    from backend.core.utils.file_opener import open_path
+    from backend.core.utils.file_resolver import resolve_output_path
+    from backend.core.utils.paths import get_docs_dir
+    from backend.core.utils.pdf_converter import convert_docx_to_pdf
+    from backend.processing.docx import docx_exporter
+    from backend.processing.excel_processor import ExcelProcessor
+    from backend.processing.workbook.multi_bay_payload import build_export_payload
+    from backend.sidecar.state import get_state
+
+    if docx_exporter._Document is None:
+        return {
+            "status": "erro",
+            "mensagem": (
+                "python-docx não está instalado. "
+                "Rode: pip install -r requirements.txt"
+            ),
+        }
+
+    bays = get_state().project_data.get("bays", {})
+    if not bays:
+        return {"status": "erro", "mensagem": "Nenhum bay encontrado no projeto."}
+
+    template = _resolve_docx_template(template_path)
+    if not template:
+        return {
+            "status": "erro",
+            "mensagem": (
+                "Modelo .docx não encontrado. Coloque um arquivo .docx em "
+                f"{get_docs_dir()} ou informe template_path."
+            ),
+        }
+
+    bay_data_list, skipped = build_export_payload(bays)
+    if bay_id:
+        bay_data_list = [bay for bay in bay_data_list if bay.get("name") == bay_id]
+        if not bay_data_list:
+            return {
+                "status": "erro",
+                "mensagem": f"Bay '{bay_id}' não encontrado para exportar.",
+                "pulados": skipped,
+            }
+
+    if not bay_data_list:
+        return {
+            "status": "erro",
+            "mensagem": "Nenhum bay com dados válidos para exportar.",
+            "pulados": skipped,
+        }
+
+    try:
+        ExcelProcessor().process_multiple_bays(bay_data_list)
+    except Exception as e:
+        log.exception("Erro ao gerar os workbooks para o PDF")
+        return {"status": "erro", "mensagem": str(e), "pulados": skipped}
+
+    bay_workbooks = [
+        (bay["name"], bay["_workbook"])
+        for bay in bay_data_list
+        if "_workbook" in bay
+    ]
+    if not bay_workbooks:
+        return {
+            "status": "erro",
+            "mensagem": "Nenhum bay pôde ser processado.",
+            "pulados": skipped,
+        }
+
+    output_pdf = resolve_output_path("Relatorio_Equipamentos", ".pdf", output_path)
+    if is_file_locked(str(output_pdf)):
+        return {
+            "status": "arquivo_aberto",
+            "arquivo": str(output_pdf),
+            "mensagem": (
+                f"O arquivo '{output_pdf.name}' está aberto em outro programa. "
+                "Feche-o e tente novamente."
+            ),
+            "pulados": skipped,
+        }
+
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp_file:
+        temp_docx_path = Path(tmp_file.name)
+
+    try:
+        stats = docx_exporter.build_docx(template, str(temp_docx_path), bay_workbooks)
+        convert_docx_to_pdf(temp_docx_path, output_pdf)
+    except Exception as e:
+        log.exception("Erro ao gerar o PDF a partir do modelo")
+        return {
+            "status": "erro",
+            "mensagem": f"Falha na geração do PDF: {e}",
+            "pulados": skipped,
+        }
+    finally:
+        try:
+            if temp_docx_path.exists():
+                temp_docx_path.unlink()
+        except Exception:
+            pass
+
+    aberto = False
+    aviso = None
+    try:
+        open_path(output_pdf)
+        aberto = True
+    except Exception as exc:
+        aviso = f"Não foi possível abrir o PDF: {exc}"
+        log.warning("export_pdf: falha ao abrir %s: %s", output_pdf, exc)
+
+    total = stats["tabelas"]
+    mensagem = (
+        f"Relatório PDF gerado: {output_pdf.name} "
+        f"({len(bay_workbooks)} bay(s), {total} tabela(s)"
+    )
+    if stats["chaves_sem_tabela"]:
+        mensagem += (
+            f"; sem tabela: {', '.join(stats['chaves_sem_tabela'])}"
+        )
+    mensagem += ")"
+    if aberto:
+        mensagem += " — aberto no aplicativo padrão."
+    elif aviso:
+        mensagem += f" — {aviso}"
+
+    log.info(
+        "export_pdf: %d bays, %d tabelas -> %s",
+        len(bay_workbooks),
+        total,
+        output_pdf,
+    )
+    return {
+        "status": "sucesso",
+        "arquivo": str(output_pdf),
+        "bays": len(bay_workbooks),
+        "tabelas": total,
+        "aberto": aberto,
+        "aviso": aviso,
+        "chaves_inseridas": stats["chaves_inseridas"],
+        "chaves_sem_tabela": stats["chaves_sem_tabela"],
+        "bays_sem_tabela": stats["bays_sem_tabela"],
+        "pulados": skipped,
+        "mensagem": mensagem,
+    }
+
+
 def export_docx_univer(
     bay_id: str | None = None,
     template_path: str | None = None,
