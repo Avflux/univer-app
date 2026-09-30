@@ -45,7 +45,7 @@ A API sobe em <http://127.0.0.1:8000> com CORS liberado para `localhost:5173`.
 ### Frontend
 
 ```bash
-cd univer-app/frontend
+cd C:\Users\rno\Desktop\APPs\univer-app\frontend
 pnpm install
 pnpm dev
 ```

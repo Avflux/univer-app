@@ -1,10 +1,10 @@
-import type { DocxUniverResult, Health, OutputResult } from './api';
+import type { DocxUniverResult, Health, OutputResult } from '../api';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { API_BASE, univerApi } from './api';
-import { buildOutputDocument } from './document';
-import { UniverDocument } from './UniverDoc';
-import { UniverSpreadsheet } from './UniverSheet';
-import { buildOutputWorkbook } from './workbook';
+import { API_BASE, univerApi } from '../api';
+import { buildOutputDocument } from '../document';
+import { UniverDocument } from '../UniverDoc';
+import { UniverSpreadsheet } from '../UniverSheet';
+import { buildOutputWorkbook } from '../workbook';
 
 interface StatusMessage {
     tipo: 'ok' | 'erro' | 'info';

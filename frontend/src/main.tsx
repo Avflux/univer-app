@@ -20,8 +20,8 @@ import '@univerjs/preset-sheets-note/lib/index.css';
 import '@univerjs/preset-sheets-sort/lib/index.css';
 import '@univerjs/preset-sheets-table/lib/index.css';
 import '@univerjs/preset-sheets-thread-comment/lib/index.css';
-import { App } from './App';
-import './global.css';
+import { App } from './ui/App';
+import './ui/global.css';
 
 const container = document.getElementById('root');
 
