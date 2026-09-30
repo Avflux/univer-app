@@ -12,6 +12,8 @@ import { useEffect, useRef } from 'react';
 
 export interface UniverDocumentProps {
     snapshot: IDocumentData;
+    /** Ativa o modo escuro do Univer (chrome/ribbon), alinhado ao tema do app. */
+    dark?: boolean;
 }
 
 /**
@@ -19,7 +21,7 @@ export interface UniverDocumentProps {
  *
  * Cada snapshot novo remonta a instância do Univer para isolar o ciclo de vida.
  */
-export function UniverDocument({ snapshot }: UniverDocumentProps) {
+export function UniverDocument({ snapshot, dark = false }: UniverDocumentProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -30,6 +32,7 @@ export function UniverDocument({ snapshot }: UniverDocumentProps) {
 
         const { univer, univerAPI } = createUniver({
             locale: LocaleType.PT_BR,
+            darkMode: dark,
             locales: {
                 [LocaleType.PT_BR]: mergeLocales(
                     docsLocale,
@@ -55,7 +58,7 @@ export function UniverDocument({ snapshot }: UniverDocumentProps) {
         return () => {
             univer.dispose();
         };
-    }, [snapshot]);
+    }, [snapshot, dark]);
 
     return <div className="app-sheet app-doc" ref={containerRef} />;
 }

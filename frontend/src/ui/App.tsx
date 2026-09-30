@@ -1,10 +1,12 @@
-import type { DocxUniverResult, Health, OutputResult } from '../api';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { DocxUniverResult, OutputResult } from '../api';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE, univerApi } from '../api';
 import { buildOutputDocument } from '../document';
 import { UniverDocument } from '../UniverDoc';
 import { UniverSpreadsheet } from '../UniverSheet';
 import { buildOutputWorkbook } from '../workbook';
+import { applyTheme, getInitialTheme, saveTheme } from './theme';
+import type { Theme } from './theme';
 
 interface StatusMessage {
     tipo: 'ok' | 'erro' | 'info';
@@ -13,8 +15,10 @@ interface StatusMessage {
     href?: string;
 }
 
+/** Mensagem do backend quando o projeto aberto não contém nenhum bay. */
+const MSG_NENHUM_BAY = 'Nenhum bay encontrado no projeto.';
+
 export function App() {
-    const [health, setHealth] = useState<Health | null>(null);
     const [output, setOutput] = useState<OutputResult | null>(null);
     const [docResult, setDocResult] = useState<DocxUniverResult | null>(null);
     const [view, setView] = useState<'sheet' | 'doc'>('sheet');
@@ -22,8 +26,64 @@ export function App() {
     const [message, setMessage] = useState<StatusMessage | null>(null);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
-    const [projectPath, setProjectPath] = useState('');
     const [loadingProject, setLoadingProject] = useState(false);
+    /** Tema da aplicação (claro/escuro) — persistido em `localStorage`. */
+    const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
+    /** Pausa a contagem do toast enquanto o mouse está sobre ele. */
+    const [toastPaused, setToastPaused] = useState(false);
+
+    /**
+     * `true` depois que um `.md` é carregado nesta sessão. A tela inicial não
+     * tem arquivo aberto, então o aviso de "nenhum bay" não faz sentido ali —
+     * ele só aparece quando o arquivo carregado veio sem bay.
+     */
+    const projectLoadedRef = useRef(false);
+
+    /**
+     * O backend é um processo separado: o projeto aberto sobrevive ao F5.
+     * Este guard faz com que só a primeira carga (montagem da tela) zere o
+     * backend — recarregar a página volta o app ao estado inicial vazio.
+     */
+    const resetBackendRef = useRef(false);
+
+    useLayoutEffect(() => {
+        applyTheme(theme);
+    }, [theme]);
+
+    /**
+     * O aviso não é mais uma faixa que ocupa a janela: é um toast flutuante
+     * que some sozinho — mais tempo para erro e para mensagens com link de
+     * download, e a contagem pausa quando o mouse fica sobre ele.
+     */
+    useEffect(() => {
+        if (!message || toastPaused) {
+            return undefined;
+        }
+        const duracao = message.href ? 15000 : message.tipo === 'erro' ? 10000 : 6000;
+        const timer = window.setTimeout(() => setMessage(null), duracao);
+        return () => window.clearTimeout(timer);
+    }, [message, toastPaused]);
+
+    /** Alterna entre claro e escuro, guardando a escolha do usuário. */
+    const toggleTheme = useCallback(() => {
+        const next: Theme = theme === 'dark' ? 'light' : 'dark';
+        setTheme(next);
+        saveTheme(next);
+    }, [theme]);
+
+    /**
+     * Reescreve o aviso de "nenhum bay" quando nenhum `.md` foi carregado:
+     * ali o problema é a falta de projeto, não o arquivo. Com um projeto
+     * aberto a mensagem original passa direto — é o único caso em que
+     * "Nenhum bay encontrado no projeto." deve aparecer.
+     */
+    const mensagemComProjeto = useCallback(
+        (texto: string): string =>
+            !projectLoadedRef.current && texto === MSG_NENHUM_BAY
+                ? 'Nenhum projeto carregado. Abra um arquivo .md para continuar.'
+                : texto,
+        []
+    );
 
     /**
      * Gera a tabela de saída no backend e devolve a mensagem de status, sem
@@ -63,11 +123,25 @@ export function App() {
         setLoading(true);
         setMessage(null);
         try {
-            const healthResult = await univerApi.health();
-            setHealth(healthResult);
-            setMessage(await generateOutput());
+            // Só para confirmar que a API responde antes de gerar a saída —
+            // falhou aqui, cai no catch abaixo.
+            await univerApi.health();
+
+            // F5 não limpa o estado do backend, então ele é zerado aqui na
+            // primeira carga. A resposta é ignorada de propósito: no modo
+            // demo não há serviço para zerar e isso não pode derrubar a tela.
+            if (!resetBackendRef.current) {
+                resetBackendRef.current = true;
+                await univerApi.newProject().catch(() => undefined);
+            }
+
+            const status = await generateOutput();
+            setMessage(
+                !projectLoadedRef.current && status.texto === MSG_NENHUM_BAY
+                    ? null
+                    : status
+            );
         } catch (error) {
-            setHealth(null);
             setOutput(null);
             setMessage({
                 tipo: 'erro',
@@ -104,7 +178,9 @@ export function App() {
             } else {
                 setMessage({
                     tipo: 'erro',
-                    texto: result.mensagem ?? 'Não foi possível carregar o modelo no Univer Doc.',
+                    texto: mensagemComProjeto(
+                        result.mensagem ?? 'Não foi possível carregar o modelo no Univer Doc.'
+                    ),
                 });
             }
         } catch (error) {
@@ -117,12 +193,12 @@ export function App() {
         } finally {
             setBusy(false);
         }
-    }, []);
+    }, [mensagemComProjeto]);
 
     /** Pede ao backend que abra um projeto .md do disco. */
     const loadProject = useCallback(
-        async (pathArg?: string) => {
-            const path = (pathArg ?? projectPath).trim();
+        async (pathArg: string) => {
+            const path = pathArg.trim();
             if (!path) {
                 setMessage({ tipo: 'erro', texto: 'Informe o caminho de um arquivo .md de projeto.' });
                 return;
@@ -139,21 +215,27 @@ export function App() {
                     return;
                 }
 
-                // Reflete o caminho realmente carregado (inclusive o escolhido no
-                // diálogo nativo) na barra de projeto.
-                setProjectPath(path);
-
                 // Relê o projeto e remonta a saída com os dados recém-carregados.
                 // `load()` limpa a mensagem, então ela é reposta depois.
+                projectLoadedRef.current = true;
                 await load();
                 if (view === 'doc') {
                     await loadDoc();
                 }
                 const nome = path.split(/[\\/]/).pop() ?? path;
-                setMessage({
-                    tipo: 'ok',
-                    texto: `Projeto carregado: ${nome} (${result.bays ?? 0} bay(s)).`,
-                });
+                // Sem bay no arquivo, o aviso do backend é o que interessa — é
+                // o único caso em que "Nenhum bay encontrado" deve aparecer.
+                setMessage(
+                    result.bays
+                        ? {
+                              tipo: 'ok',
+                              texto: `Projeto carregado: ${nome} (${result.bays} bay(s)).`,
+                          }
+                        : {
+                              tipo: 'erro',
+                              texto: `Projeto carregado: ${nome}. ${MSG_NENHUM_BAY}`,
+                          }
+                );
             } catch (error) {
                 setMessage({
                     tipo: 'erro',
@@ -165,7 +247,7 @@ export function App() {
                 setLoadingProject(false);
             }
         },
-        [load, projectPath]
+        [load, loadDoc, view]
     );
 
     /** Abre o diálogo nativo "Abrir" no backend e carrega o .md escolhido. */
@@ -220,7 +302,9 @@ export function App() {
             } else {
                 setMessage({
                     tipo: 'erro',
-                    texto: result.mensagem ?? 'Não foi possível gerar o relatório .docx.',
+                    texto: mensagemComProjeto(
+                        result.mensagem ?? 'Não foi possível gerar o relatório .docx.'
+                    ),
                 });
             }
         } catch (error) {
@@ -233,28 +317,28 @@ export function App() {
         } finally {
             setBusy(false);
         }
-    }, []);
+    }, [mensagemComProjeto]);
 
     const workbook = useMemo(() => (output ? buildOutputWorkbook(output) : null), [output]);
     const docSnapshot = useMemo(() => (docResult ? buildOutputDocument(docResult) : null), [docResult]);
-    const modo = health?.modo ?? 'erro';
 
     return (
         <div className="app-app">
             <header className="app-header">
                 <div className="app-brand">
                     <span className="app-logo" aria-hidden="true">N</span>
-                    <h1 className="app-title">Univer — Saída da exportação</h1>
-                    <span className="app-badge" data-modo={modo}>
-                        {health ? `API: ${modo}` : 'API offline'}
-                    </span>
-                    <span className="app-badge" data-modo="saida">
-                        {view === 'doc' ? 'univer doc' : 'somente leitura'}
-                    </span>
+                    <h1 className="app-title">Univer</h1>
                 </div>
 
                 <div className="app-actions">
-                    <span className="app-api-base" title={API_BASE}>{API_BASE}</span>
+                    <button
+                        className="app-button"
+                        data-variant="primary"
+                        disabled={loadingProject || busy}
+                        onClick={() => void chooseProject()}
+                    >
+                        Carregar arquivo…
+                    </button>
                     {output && docResult && (
                         <div className="app-view-switch" role="group" aria-label="Modo de visualização">
                             <button
@@ -283,7 +367,7 @@ export function App() {
                         disabled={busy || loading}
                         onClick={() => void loadDoc()}
                     >
-                        Carregar Doc
+                        Gerar Doc
                     </button>
                     <button
                         className="app-button"
@@ -292,49 +376,47 @@ export function App() {
                     >
                         Exportar .docx
                     </button>
+                    <button
+                        className="app-button app-button--icon"
+                        aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+                        aria-pressed={theme === 'dark'}
+                        disabled={busy || loading}
+                        onClick={toggleTheme}
+                        title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+                    >
+                        {theme === 'dark' ? '☀️' : '🌙'}
+                    </button>
                 </div>
             </header>
 
-            <div className="app-project-bar">
-                <label htmlFor="app-project-path">Projeto (.md)</label>
-                <input
-                    className="app-input"
-                    id="app-project-path"
-                    onChange={(event) => setProjectPath(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                            void loadProject();
-                        }
-                    }}
-                    placeholder="Escolha um arquivo .md ou digite o caminho"
-                    spellCheck={false}
-                    value={projectPath}
-                />
-                <button
-                    className="app-button"
-                    data-variant="primary"
-                    disabled={loadingProject || busy}
-                    onClick={() => void chooseProject()}
-                >
-                    Escolher arquivo…
-                </button>
-                <button
-                    className="app-button"
-                    disabled={loadingProject || busy || !projectPath.trim()}
-                    onClick={() => void loadProject()}
-                >
-                    Carregar
-                </button>
-            </div>
-
             {message && (
-                <div className="app-status" data-tipo={message.tipo}>
-                    {message.texto}
+                <div
+                    aria-live="polite"
+                    className="app-toast"
+                    data-tipo={message.tipo}
+                    role="status"
+                    onMouseEnter={() => setToastPaused(true)}
+                    onMouseLeave={() => setToastPaused(false)}
+                >
+                    <span className="app-toast-text">{message.texto}</span>
                     {message.href && (
-                        <a href={message.href} target="_blank" rel="noreferrer">
+                        <a
+                            className="app-toast-link"
+                            href={message.href}
+                            rel="noreferrer"
+                            target="_blank"
+                        >
                             baixar arquivo
                         </a>
                     )}
+                    <button
+                        aria-label="Fechar aviso"
+                        className="app-toast-close"
+                        onClick={() => setMessage(null)}
+                        type="button"
+                    >
+                        ×
+                    </button>
                 </div>
             )}
 
@@ -344,6 +426,7 @@ export function App() {
                         <UniverDocument
                             key={`doc-${revision}`}
                             snapshot={docSnapshot}
+                            dark={theme === 'dark'}
                         />
                     )
                     : workbook
@@ -352,6 +435,7 @@ export function App() {
                                 key={`saida-${revision}`}
                                 snapshot={workbook.snapshot}
                                 tables={workbook.tables}
+                                dark={theme === 'dark'}
                             />
                         )
                         : (

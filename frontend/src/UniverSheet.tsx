@@ -29,6 +29,8 @@ interface UniverSpreadsheetProps {
     snapshot: IWorkbookData;
     /** Seções da saída que viram tabelas do Univer (cabeçalho e filtros). */
     tables: SheetTableSpec[];
+    /** Ativa o modo escuro do Univer (chrome/ribbon), alinhado ao tema do app. */
+    dark?: boolean;
 }
 
 /**
@@ -38,7 +40,7 @@ interface UniverSpreadsheetProps {
  * componente para forçar o remount), o que mantém o ciclo de vida simples:
  * um Univer por snapshot.
  */
-export function UniverSpreadsheet({ snapshot, tables }: UniverSpreadsheetProps) {
+export function UniverSpreadsheet({ snapshot, tables, dark = false }: UniverSpreadsheetProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const tablesRef = useRef(tables);
     tablesRef.current = tables;
@@ -51,6 +53,7 @@ export function UniverSpreadsheet({ snapshot, tables }: UniverSpreadsheetProps) 
 
         const { univer, univerAPI } = createUniver({
             locale: LocaleType.PT_BR,
+            darkMode: dark,
             locales: {
                 [LocaleType.PT_BR]: mergeLocales(
                     coreLocale,
@@ -105,7 +108,7 @@ export function UniverSpreadsheet({ snapshot, tables }: UniverSpreadsheetProps) 
             disposed = true;
             univer.dispose();
         };
-    }, [snapshot]);
+    }, [snapshot, dark]);
 
     return <div className="app-sheet" ref={containerRef} />;
 }

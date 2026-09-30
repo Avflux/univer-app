@@ -193,6 +193,12 @@ export const univerApi = {
             body: JSON.stringify({ path }),
         }),
 
+    /** Zera o projeto aberto em memória (projeto vazio). */
+    newProject: () =>
+        request<{ status: string; mensagem?: string }>('/api/project/new', {
+            method: 'POST',
+        }),
+
     /** Gera a saída no backend e devolve as abas para montar no Univer. */
     exportAllBaysUniver: () =>
         request<OutputResult>('/api/export/all-bays/univer', {

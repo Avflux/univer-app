@@ -21,7 +21,12 @@ import '@univerjs/preset-sheets-sort/lib/index.css';
 import '@univerjs/preset-sheets-table/lib/index.css';
 import '@univerjs/preset-sheets-thread-comment/lib/index.css';
 import { App } from './ui/App';
+import { applyTheme, getInitialTheme } from './ui/theme';
 import './ui/global.css';
+
+// Tema antes do primeiro render: evita o flash de tema errado enquanto o
+// React monta a árvore.
+applyTheme(getInitialTheme());
 
 const container = document.getElementById('root');
 
