@@ -120,9 +120,9 @@ function outputStyle(style: OutputCellStyle): IStyleData {
     if (style.size) {
         result.fs = style.size;
     }
-    if (style.color) {
-        result.cl = { rgb: style.color };
-    }
+    // Garante cor de texto escura se não especificada, impedindo que cabeçalhos
+    // e títulos herdem a cor branca (#fff) padrão do tema de tabelas do Univer.
+    result.cl = { rgb: style.color ?? '#1f2329' };
     if (style.fill) {
         result.bg = { rgb: style.fill };
     }

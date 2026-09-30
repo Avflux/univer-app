@@ -100,7 +100,15 @@ export function UniverSpreadsheet({ snapshot, tables, dark = false }: UniverSpre
                     return;
                 }
                 const worksheet = workbook?.getSheetBySheetId(table.sheetId);
-                await worksheet?.addTable(table.name, table.range, `${table.sheetId}-${table.name}`);
+                const tableId = `${table.sheetId}-${table.name}`;
+                await worksheet?.addTable(table.name, table.range, tableId);
+                await worksheet?.addTableTheme(tableId, {
+                    name: `theme-${tableId}`,
+                    headerRowStyle: {
+                        bg: { rgb: '#e0e0e0' },
+                        cl: { rgb: '#1f2329' },
+                    },
+                });
             }
         })();
 
