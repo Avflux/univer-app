@@ -72,7 +72,7 @@ export function UniverSpreadsheet({ snapshot, tables, dark = false }: UniverSpre
             presets: [
                 UniverSheetsCorePreset({
                     container,
-                    ribbonType: 'grid',
+                    ribbonType: 'classic',
                 }),
                 UniverSheetsDrawingPreset(),
                 UniverSheetsConditionalFormattingPreset(),

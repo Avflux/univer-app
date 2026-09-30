@@ -44,7 +44,7 @@ export function UniverDocument({ snapshot, dark = false }: UniverDocumentProps) 
             presets: [
                 UniverDocsCorePreset({
                     container,
-                    ribbonType: 'grid',
+                    ribbonType: 'classic',
                     toc: true,
                 }),
                 UniverDocsDrawingPreset(),
