@@ -14,11 +14,11 @@ export default defineConfig(({ command, mode }): UserConfig => ({
         bundledDev: command === 'serve' && mode !== 'test',
     },
     preview: {
-        port: 5173,
+        port: 5180,
         strictPort: true,
     },
     server: {
-        port: 5173,
+        port: 5180,
         strictPort: true,
     },
 }));

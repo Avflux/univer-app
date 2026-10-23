@@ -1,7 +1,7 @@
 """API HTTP local do Univer — ponte para o núcleo headless do sidecar.
 
 Este módulo expõe o núcleo headless (``backend.sidecar.service``) via
-HTTP + JSON, para que o frontend React/Vite (http://localhost:5173) leia o
+HTTP + JSON, para que o frontend React/Vite (http://localhost:5180) leia o
 projeto e monte a planilha na tela.
 
 Uso::
@@ -63,8 +63,8 @@ except ImportError as exc:  # pragma: no cover - depende do ambiente
 
 API_VERSION = "1.0.0"
 FRONTEND_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    "http://localhost:5180",
+    "http://127.0.0.1:5180",
 ]
 
 # --- Núcleo headless (lazy) ------------------------------------------------

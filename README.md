@@ -40,7 +40,7 @@ backend/venv/Scripts/pip install -r backend/requirements.txt   # Windows
 python -m backend.api
 ```
 
-A API sobe em <http://127.0.0.1:8000> com CORS liberado para `localhost:5173`.
+A API sobe em <http://127.0.0.1:8000> com CORS liberado para `localhost:5180`.
 
 ### Frontend
 
@@ -50,7 +50,7 @@ pnpm install
 pnpm dev
 ```
 
-A aplicação sobe em <http://localhost:5173> (`strictPort`).
+A aplicação sobe em <http://localhost:5180> (`strictPort`).
 
 ## Variáveis de ambiente
 
